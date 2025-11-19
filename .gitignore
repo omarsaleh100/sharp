@@ -1,49 +1,48 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual Environments
-venv/
-env/
-brillianse-env/ # From your old project, good to keep
-*.local
-
-# Secrets
-.env
-.env*
-!.env.example
-firebase-key.json
-*.sqlite3
-
-# OS
+# --- System & Logs ---
 .DS_Store
-
-# Firebase
-firebase-debug.log
+Thumbs.db
+*.log
+npm-debug.log*
+yarn-debug.log*
+firebase-debug.log*
 firebase-debug.*.log
 
-# Frontend (from brillianse/frontend/.gitignore)
-/frontend/node_modules
-/frontend/.pnp
-/frontend/.pnp.*
-/frontend/.yarn/*
-!/frontend/.yarn/patches
-!/frontend/.yarn/plugins
-!/frontend/.yarn/releases
-!/frontend/.yarn/versions
-/frontend/coverage
-/frontend/.next/
-/frontend/out/
-/frontend/build
-/frontend/.DS_Store
-/frontend/*.pem
-/frontend/npm-debug.log*
-/frontend/yarn-debug.log*
-/frontend/yarn-error.log*
-/frontend/.pnpm-debug.log*
-/frontend/.env.local
-/frontend/.vercel
-/frontend/*.tsbuildinfo
-/frontend/next-env.d.ts
+# --- Firebase ---
 .firebase/
+.firebaserc
+firebase-key.json
+
+# --- Root & General Dependencies ---
+node_modules/
+.pnp
+.pnp.js
+
+# --- Frontend (Next.js) ---
+# These ignore patterns apply specifically to the frontend folder
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/dist/
+frontend/coverage/
+frontend/.vercel/
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+frontend/.env.local
+frontend/.env.production.local
+frontend/.env.development.local
+frontend/.env.test.local
+
+# --- Functions (Python) ---
+# These ignore patterns apply specifically to the functions folder
+functions/venv/
+functions/env/
+functions/__pycache__/
+functions/*.py[cod]
+functions/*$py.class
+functions/.python-version
+
+# --- Environment Variables (CRITICAL) ---
+# Ignores .env files in root or any subdirectory
+.env
+.env.*
+!.env.example
