@@ -251,13 +251,17 @@ function GameContent() {
       {gameState && gameState.turn >= 20 && (
         <GameOverModal 
             history={gameState.history} 
+            portfolio={gameState.portfolio}
             onRestart={() => router.push('/')} 
         />
       )}
     </main>
 )}
 
-function GameOverModal({ history, onRestart }: { history: number[], onRestart: () => void }) {
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
+import { auth } from '@/lib/firebase'; // Make sure auth is imported
+
+function GameOverModal({ history, portfolio, onRestart }: { history: number[], portfolio: any, onRestart: () => void }) {
     const score = calculateSharpeRatio(history);
     const finalValue = history[history.length - 1];
     const profit = ((finalValue - 1000000) / 1000000) * 100;
@@ -269,32 +273,61 @@ function GameOverModal({ history, onRestart }: { history: number[], onRestart: (
     const saveScore = async () => {
         if (!username) return;
         setSaving(true);
+        
         try {
+            // 1. Get Today's Game Date
+            const configRef = doc(db, 'config', 'dailyAssets');
+            const configSnap = await getDoc(configRef);
+            const gameDate = configSnap.exists() ? configSnap.data().date : new Date().toISOString().split('T')[0];
+
+            // 2. Save Score
             await addDoc(collection(db, 'scores'), {
                 username,
                 score: parseFloat(score.toFixed(2)),
                 finalPortfolioValue: finalValue,
-                date: serverTimestamp()
+                date: serverTimestamp(),
+                gameDate: gameDate
             });
+
+            // 3. Mark User as Played (if logged in)
+            if (auth.currentUser) {
+                const userRef = doc(db, 'users', auth.currentUser.uid);
+                // Use setDoc with merge in case doc doesn't exist
+                await setDoc(userRef, { lastPlayedDate: gameDate }, { merge: true });
+            }
+
             setSaved(true);
         } catch (err) {
             console.error("Error saving score:", err);
-            alert("Could not save score. Check console.");
+            alert("Could not save score.");
         } finally {
             setSaving(false);
         }
     };
 
     return (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm">
+        <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 backdrop-blur-md overflow-y-auto py-10">
             <motion.div 
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="bg-gray-900 border border-purple-500 p-8 rounded-2xl max-w-md w-full text-center shadow-[0_0_50px_rgba(168,85,247,0.3)]"
+                className="bg-gray-900 border border-purple-500 p-8 rounded-2xl max-w-2xl w-full text-center shadow-[0_0_50px_rgba(168,85,247,0.3)]"
             >
                 <h2 className="text-3xl font-bold text-white mb-2">Simulation Complete</h2>
-                <div className="text-gray-400 mb-6">5-Year Market Cycle Finished</div>
+                
+                {/* --- NEW: Market Intel Section --- */}
+                <div className="text-left bg-black/50 p-6 rounded-xl border border-gray-800 mb-8">
+                    <h3 className="text-gray-400 uppercase text-xs font-bold mb-4 tracking-wider">Market Intelligence Report</h3>
+                    <div className="space-y-3">
+                        {Object.entries(portfolio).map(([ticker, data]: [string, any]) => (
+                            <div key={ticker} className="flex gap-4">
+                                <span className="font-bold text-purple-400 w-16 shrink-0">{ticker}</span>
+                                <p className="text-gray-300 text-sm italic">"{data.narrative}"</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
 
+                {/* Stats Grid */}
                 <div className="grid grid-cols-2 gap-4 mb-8">
                     <div className="bg-gray-800 p-4 rounded-lg">
                         <div className="text-xs text-gray-500 uppercase">Total Return</div>
@@ -310,6 +343,7 @@ function GameOverModal({ history, onRestart }: { history: number[], onRestart: (
                     </div>
                 </div>
 
+                {/* Save Form */}
                 {!saved ? (
                     <div className="space-y-3">
                         <input 
@@ -328,17 +362,18 @@ function GameOverModal({ history, onRestart }: { history: number[], onRestart: (
                         </button>
                     </div>
                 ) : (
-                    <div className="text-green-400 font-bold text-lg mb-4">
-                        Score Saved!
+                    <div>
+                        <div className="text-green-400 font-bold text-lg mb-4">
+                            Score Saved! See you tomorrow.
+                        </div>
+                        <button 
+                            onClick={() => window.location.href = '/leaderboard'}
+                            className="px-6 py-2 bg-gray-800 rounded-full hover:bg-gray-700"
+                        >
+                            Go to Leaderboard
+                        </button>
                     </div>
                 )}
-
-                <button 
-                    onClick={onRestart}
-                    className="mt-6 text-gray-500 hover:text-white text-sm underline"
-                >
-                    Start New Simulation
-                </button>
             </motion.div>
         </div>
     );
