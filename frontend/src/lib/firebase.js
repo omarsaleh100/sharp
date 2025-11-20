@@ -27,11 +27,8 @@ if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
   // Firestore (Port 8080)
   connectFirestoreEmulator(db, '127.0.0.1', 8080);
   
-  // Auth (Port 9099)
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099');
-  
-  // Storage (Port 9199 - optional, check firebase.json if you enabled it)
-  // connectStorageEmulator(storage, '127.0.0.1', 9199);
+  // Auth (Port 9099) - ADDED { disableWarnings: true }
+  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
   
   // Functions (Port 5001)
   connectFunctionsEmulator(functions, '127.0.0.1', 5001);
