@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { db } from '@/lib/firebase';
-import { doc, onSnapshot } from 'firebase/firestore'; // <--- Changed getDoc to onSnapshot
+import { db, auth } from '@/lib/firebase';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import { motion } from 'framer-motion';
 
 interface Asset {
@@ -18,49 +19,79 @@ export default function AssetSelection() {
   const [loading, setLoading] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [hasPlayed, setHasPlayed] = useState(false); // <--- NEW STATE
   const router = useRouter();
 
-  // 1. Real-time Listener for Assets
+  // 1. Listen for Auth & Game Status
   useEffect(() => {
-    const docRef = doc(db, 'config', 'dailyAssets');
-    
-    // This listener fires immediately, and again whenever the DB changes
-    const unsubscribe = onSnapshot(docRef, (docSnap) => {
-      if (docSnap.exists()) {
-          const data = docSnap.data();
-          setAssets(data.assets || []);
-          if (data.lastUpdated) {
-              // Force Toronto Time (ET)
-              const timeString = new Date(data.lastUpdated).toLocaleTimeString('en-US', {
-                  timeZone: 'America/New_York',
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true
-              });
-              setLastUpdated(`${timeString} ET`);
-          }
-      }
-      setLoading(false);
-  });
+    let unsubscribeAssets: () => void;
 
-    return () => unsubscribe();
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      try {
+        // A. Get the Official "Game Date" from Config
+        const configRef = doc(db, 'config', 'dailyAssets');
+        const configSnap = await getDoc(configRef);
+        
+        if (!configSnap.exists()) {
+             setLoading(false);
+             return;
+        }
+
+        const gameDate = configSnap.data().date; // e.g. "2025-11-20"
+
+        // B. Check if User Played Today (Only if logged in)
+        if (user) {
+          const userRef = doc(db, 'users', user.uid);
+          const userSnap = await getDoc(userRef);
+          
+          if (userSnap.exists()) {
+            const userData = userSnap.data();
+            if (userData.lastPlayedDate === gameDate) {
+              setHasPlayed(true);
+            }
+          }
+        }
+
+        // C. Listen to Asset Updates (Real-time)
+        unsubscribeAssets = onSnapshot(configRef, (docSnap) => {
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            setAssets(data.assets || []);
+            if (data.lastUpdated) {
+                const timeString = new Date(data.lastUpdated).toLocaleTimeString('en-US', {
+                    timeZone: 'America/New_York',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                });
+                setLastUpdated(`${timeString} ET`);
+            }
+          }
+          setLoading(false);
+        });
+
+      } catch (err) {
+        console.error("Error initializing:", err);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeAssets) unsubscribeAssets();
+    };
   }, []);
 
-  // 2. Function to Trigger Manual Update
+  // 2. Manual Sync Function
   const handleSyncMarket = async () => {
     setIsSyncing(true);
     try {
-        // Call the backend function directly
         await fetch('http://127.0.0.1:5001/sharp-80263/us-central1/generate_daily_market', {
-            mode: 'no-cors' // <--- ADD THIS LINE
+            mode: 'no-cors'
         });
-        
-        // The onSnapshot listener above will catch the DB change automatically!
     } catch (err) {
         console.error("Sync failed:", err);
-        // alert("Failed to sync..."); // You can comment this out now since it might be a false alarm
     } finally {
-        // Give it a fake buffer time just so the spinner doesn't flicker too fast
         setTimeout(() => setIsSyncing(false), 1000);
     }
   };
@@ -81,7 +112,33 @@ export default function AssetSelection() {
     router.push(`/game?tickers=${query}`);
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-black text-white">Connecting to Market Feed...</div>;
+  if (loading) return <div className="flex h-screen items-center justify-center bg-black text-white">Checking Market Status...</div>;
+
+  // --- NEW: LOCKOUT SCREEN ---
+  if (hasPlayed) {
+    return (
+      <main className="min-h-screen bg-black text-white flex flex-col items-center justify-center p-8 text-center font-sans">
+        <motion.div 
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="max-w-md w-full bg-gray-900 border border-gray-800 p-8 rounded-2xl"
+        >
+            <h1 className="text-3xl font-bold text-red-500 mb-4">Markets Closed</h1>
+            <p className="text-gray-400 mb-8">
+                You have already traded for today. <br/>
+                The market will reopen tomorrow with new assets.
+            </p>
+            
+            <button 
+                onClick={() => router.push('/leaderboard')}
+                className="w-full py-3 bg-white text-black font-bold rounded-full hover:scale-105 transition-transform"
+            >
+                View Daily Leaderboard
+            </button>
+        </motion.div>
+      </main>
+    );
+  }
 
   return (
     <main className="min-h-screen bg-black text-white p-8 font-sans">
