@@ -244,15 +244,17 @@ function GameContent() {
       <motion.div 
         animate={{ 
             scale: eventMsg ? 1.2 : 1,
+            // Removed normal purple glow, kept red glow for events only
             boxShadow: eventMsg 
-                ? '0 0 100px rgba(220, 38, 38, 0.6)' // Red glow on event
-                : '0 0 120px rgba(173, 71, 255, 0.4)' // Purple glow normal
+                ? '0 0 100px rgba(220, 38, 38, 0.6)' 
+                : 'none'
         }}
         transition={{ duration: 0.5 }}
         className={`
             absolute z-10 w-64 h-64 rounded-full
-            bg-[radial-gradient(circle,var(--color-purple-main)_0%,black_70%)]
-            ${eventMsg ? 'bg-[radial-gradient(circle,var(--color-red-600)_0%,black_70%)]' : ''}
+            /* Changed black_70% to transparent_70% */
+            bg-[radial-gradient(circle,var(--color-purple-main)_5%,transparent_70%)]
+            ${eventMsg ? 'bg-[radial-gradient(circle,var(--color-red-600)_0%,transparent_70%)]' : ''}
         `}
       />
 

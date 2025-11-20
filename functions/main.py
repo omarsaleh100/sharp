@@ -9,7 +9,8 @@ import os
 import google.generativeai as genai
 from yahooquery import Ticker
 import feedparser
-from zoneinfo import ZoneInfo # <--- Add this at the top
+from zoneinfo import ZoneInfo
+import concurrent.futures  # <--- ADD THIS
 
 # Initialize Firebase
 if not firebase_admin._apps:
@@ -62,86 +63,143 @@ def get_news_sentiment_rss(ticker):
         return 0.0, "Technical factors are driving the price."
 
 # --- 1. THE MATH ENGINE (Using yahooquery) ---
+# ... imports remain the same ...
+
+# --- 1. THE MATH ENGINE (With Strict Timeouts) ---
 def calculate_market_params(tickers):
+    print(f"Processing tickers: {tickers}")
+    
+    # Data containers
     results = {}
+    corr_matrix = np.eye(len(tickers)).tolist()
+    market_data = {"prices": {}, "history": pd.DataFrame()}
+    sentiment_map = {}
+
+    # --- WORKERS ---
+    def fetch_yahoo_worker():
+        try:
+            yq = Ticker(tickers)
+            market_data["prices"] = yq.price
+            market_data["history"] = yq.history(period='1y', interval='1d')
+            return True
+        except Exception as e:
+            print(f"Yahoo Worker Failed: {e}")
+            return False
+
+    def fetch_sentiment_worker():
+        # Create a localized executor so we don't block the main thread
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as inner_exec:
+            future_to_ticker = {
+                inner_exec.submit(lambda t: get_news_sentiment_rss(t)): t 
+                for t in tickers
+            }
+            for future in concurrent.futures.as_completed(future_to_ticker):
+                try:
+                    tkr = future_to_ticker[future]
+                    sentiment_map[tkr] = future.result()
+                except Exception:
+                    pass
+        return True
+
+    # --- MAIN CONTROLLER ---
+    # We DO NOT use the 'with' context manager here because it forces a wait.
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
     
     try:
-        print(f"Fetching bulk data for: {tickers} via yahooquery...")
-        yq = Ticker(tickers)
-        
-        # 1. Get Recent Price (Real-time snapshot)
-        # price returns a dict like: {'AAPL': {'regularMarketPrice': 180.5, ...}}
-        price_data = yq.price
-        
-        # 2. Get Historical Data for Volatility (1 year)
-        # yahooquery returns a DataFrame with MultiIndex (symbol, date)
-        history = yq.history(period='1y', interval='1d')
-        
-        # Calculate Correlation Matrix
-        # Pivot: Columns = symbols, Values = close
-        if 'adjclose' in history.columns:
-            closes = history.reset_index().pivot(index='date', columns='symbol', values='adjclose')
-        else:
-            closes = history.reset_index().pivot(index='date', columns='symbol', values='close')
-            
-        log_returns = np.log(closes / closes.shift(1))
-        # Sanitize NaN to 0
-        corr_matrix = log_returns.corr().fillna(0).values.tolist()
+        yahoo_future = executor.submit(fetch_yahoo_worker)
+        sentiment_future = executor.submit(fetch_sentiment_worker)
 
-    except Exception as e:
-        print(f"Data Fetch Error: {e}")
-        # Fallback to Identity Matrix if data fails completely
-        corr_matrix = np.eye(len(tickers)).tolist()
-        closes = pd.DataFrame()
-        price_data = {}
-
-    for ticker in tickers:
+        has_real_data = False
+        
+        # 1. Yahoo Data (Strict 4s Timeout)
         try:
-            # A. GET PRICE
-            if ticker in price_data and isinstance(price_data[ticker], dict):
-                current_price = price_data[ticker].get('regularMarketPrice')
-                if not current_price:
-                     # Fallback to last history close
-                     current_price = closes[ticker].iloc[-1] if ticker in closes else 100.0
-            else:
-                 current_price = 100.0
-
-            # B. CALCULATE VOLATILITY
-            if ticker in closes:
-                series = closes[ticker]
-                returns = np.log(series / series.shift(1))
-                sigma = float(returns.std() * (252 ** 0.5))
-                mu_base = float(returns.mean() * 252)
-            else:
-                sigma = 0.25
-                mu_base = 0.05
-            
-            # Handle NaN/Infinity
-            if np.isnan(sigma): sigma = 0.25
-            if np.isnan(mu_base): mu_base = 0.05
-
-            # C. AI SENTIMENT (RSS)
-            sentiment_drift, sentiment_reason = get_news_sentiment_rss(ticker)
-            final_mu = mu_base + sentiment_drift
-
-            results[ticker] = {
-                "price": float(current_price),
-                "mu": final_mu,
-                "sigma": sigma,
-                "narrative": sentiment_reason
-            }
-
+            has_real_data = yahoo_future.result(timeout=4)
+        except concurrent.futures.TimeoutError:
+            print("⚠️ Yahoo Data timed out. Skipping.")
         except Exception as e:
-            print(f"Error processing {ticker}: {e}")
+            print(f"Yahoo Error: {e}")
+
+        # 2. Sentiment (Strict 2s Timeout)
+        try:
+            sentiment_future.result(timeout=2)
+        except concurrent.futures.TimeoutError:
+            print("⚠️ Sentiment analysis timed out. Skipping.")
+        except Exception:
+            pass
+
+    finally:
+        # CRITICAL: This tells Python "Don't wait for stuck threads, just exit."
+        executor.shutdown(wait=False, cancel_futures=True)
+
+    # --- CONSTRUCT PAYLOAD (Fallback Logic) ---
+    try:
+        # Construct Correlation Matrix
+        if has_real_data and not market_data["history"].empty:
+            try:
+                hist = market_data["history"]
+                col = 'adjclose' if 'adjclose' in hist.columns else 'close'
+                closes = hist.reset_index().pivot(index='date', columns='symbol', values=col)
+                log_ret = np.log(closes / closes.shift(1))
+                corr_matrix = log_ret.corr().fillna(0).values.tolist()
+            except Exception:
+                pass # Keep identity matrix
+        else:
+             closes = pd.DataFrame()
+
+        # Construct Asset Data
+        for ticker in tickers:
+            # Defaults (Mock Data)
+            price = 150.0
+            sigma = 0.25
+            mu = 0.05
+            narrative = "Simulation Mode (Data Unavailable)"
+
+            if has_real_data:
+                try:
+                    # Price
+                    p_obj = market_data["prices"].get(ticker)
+                    if isinstance(p_obj, dict):
+                        price = p_obj.get('regularMarketPrice', price)
+                    elif ticker in closes:
+                        price = closes[ticker].iloc[-1]
+                    
+                    # Volatility
+                    if ticker in closes:
+                        series = closes[ticker]
+                        rets = np.log(series / series.shift(1))
+                        sigma = float(rets.std() * (252 ** 0.5))
+                        mu = float(rets.mean() * 252)
+                except:
+                    pass # Use defaults
+
+            # Sanitize NaNs
+            if np.isnan(sigma): sigma = 0.25
+            if np.isnan(mu): mu = 0.05
+
+            # Add Sentiment (if we got any before timeout)
+            drift, reason = sentiment_map.get(ticker, (0.0, ""))
+            if reason and has_real_data:
+                narrative = reason
+
             results[ticker] = {
-                "price": 100.0, "mu": 0.05, "sigma": 0.2, "narrative": "Simulation Mode (Data Unavailable)"
+                "price": float(price),
+                "mu": mu + drift,
+                "sigma": sigma,
+                "narrative": narrative
             }
+            
+    except Exception as e:
+        print(f"Construction Error: {e}")
+        # Ultimate Panic Fallback
+        for ticker in tickers:
+            results[ticker] = {"price": 100.0, "mu": 0.05, "sigma": 0.2, "narrative": "System Recovery"}
 
     return results, corr_matrix
 
 # --- 2. THE DAILY JOB (HTTP Trigger) ---
 @https_fn.on_request()
 def generate_daily_market(req: https_fn.Request) -> https_fn.Response:
+    # ... (Same as your existing code)
     print("Generating daily market assets...")
     
     candidate_pool = [
@@ -153,33 +211,24 @@ def generate_daily_market(req: https_fn.Request) -> https_fn.Response:
     assets_payload = []
     
     try:
-        # Bulk fetch for the selection screen
-        # We use yahooquery for speed and reliability
         yq = Ticker(candidate_pool)
         prices = yq.price
-        
-        # Get 1mo history for a volatility snapshot
         hist = yq.history(period='1mo', interval='1d')
         
         for ticker in candidate_pool:
             try:
-                # 1. Get Price
                 if ticker not in prices or not isinstance(prices[ticker], dict):
-                    print(f"Skipping {ticker} (No price)")
                     continue
                     
                 price = prices[ticker].get('regularMarketPrice', 0.0)
                 if price == 0.0: continue
 
-                # 2. Calculate Volatility (Standard Deviation of Returns)
-                vol = 0.2 # Default
+                vol = 0.2 
                 try:
                     t_data = hist.xs(ticker) 
                     if len(t_data) > 2:
                         col = 'adjclose' if 'adjclose' in t_data else 'close'
-                        # Log returns: ln(P_t / P_{t-1})
                         log_ret = np.log(t_data[col] / t_data[col].shift(1))
-                        # Annualize volatility (sqrt(252))
                         vol = float(log_ret.std() * (252 ** 0.5))
                 except:
                     pass
@@ -191,33 +240,32 @@ def generate_daily_market(req: https_fn.Request) -> https_fn.Response:
                 })
                 
             except Exception as e:
-                print(f"Error parsing {ticker}: {e}")
                 continue
                 
     except Exception as e:
-        print(f"Critical Data Error: {e}")
-        # Fallback: Generate Mock Data so the app doesn't break
         for ticker in candidate_pool[:5]:
              assets_payload.append({"symbol": ticker, "price": 150.0, "volatility": 0.3})
 
     et_now = datetime.now(ZoneInfo("America/New_York"))
     
     daily_data = {
-        "date": et_now.strftime("%Y-%m-%d"), # Game date is now ET
+        "date": et_now.strftime("%Y-%m-%d"),
         "assets": assets_payload,
-        "lastUpdated": et_now.isoformat(),    # Timestamp is now timezone-aware
+        "lastUpdated": et_now.isoformat(),
         "createdAt": firestore.SERVER_TIMESTAMP
     }
     
     db.collection('config').document('dailyAssets').set(daily_data)
-    print(f"Daily assets updated with {len(assets_payload)} stocks.")
     return https_fn.Response(json.dumps({"success": True, "count": len(assets_payload)}), status=200)
+
 # --- 3. THE GAME INITIALIZER ---
 @https_fn.on_request(
     cors=options.CorsOptions(
         cors_origins="*", 
         cors_methods=["GET", "POST"]
-    )
+    ),
+    timeout_sec=300, # <--- OPTIONAL: Explicitly increase timeout
+    memory=512       # <--- OPTIONAL: Increase memory if threads are heavy
 )
 def start_simulation(req: https_fn.Request) -> https_fn.Response:
     if req.method == 'OPTIONS':
@@ -230,6 +278,7 @@ def start_simulation(req: https_fn.Request) -> https_fn.Response:
         if not selected_tickers:
             return https_fn.Response(json.dumps({"error": "No tickers"}), status=400)
 
+        # Call the optimized function
         market_data, correlation = calculate_market_params(selected_tickers)
         
         game_state = {
