@@ -1,0 +1,201 @@
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --foreground: #FFFFFF;
+  
+  /* Design Tokens */
+  --color-sharp-purple: #AD47FF;
+  --color-sharp-gray: #9AA1AF;
+  --color-sharp-blue: #2C7FFF;
+  --color-sharp-white: #FFFFFF;
+  --color-card-bg: #0D0D12;
+  
+  /* Gradients */
+  --grad-orb-purple: radial-gradient(circle, var(--color-sharp-purple) 5%, transparent 70%);
+  --grad-orb-red: radial-gradient(circle, #dc2626 0%, transparent 70%);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-purple-main: var(--color-sharp-purple);
+  --color-gray-main: var(--color-sharp-gray);
+  --color-blue-main: var(--color-sharp-blue);
+  --color-card: var(--color-card-bg);
+  
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* --- UTILITIES --- */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+.mask-fade-left {
+  -webkit-mask-image: linear-gradient(to right, transparent, black 10%, black 100%);
+  mask-image: linear-gradient(to right, transparent, black 10%, black 100%);
+}
+
+@layer components {
+
+  /* ==============================
+     // HOME / ASSET GROUP PAGE STYLES //
+     ============================== */
+  
+  .home-header {
+    @apply w-full py-6 text-center z-10 shrink-0;
+  }
+
+  .home-title {
+    @apply text-5xl font-bold mb-2 text-blue-main tracking-tight;
+  }
+
+  .btn-refresh {
+    @apply text-[10px] uppercase tracking-wider flex items-center gap-2 px-3 py-1 rounded 
+           bg-gray-900 border border-gray-800 text-gray-main 
+           hover:text-white hover:border-gray-600 transition-colors;
+  }
+
+  /* The selected assets grid items */
+  /* REMOVED 'group' from here */
+  .card-asset-selected {
+    @apply relative cursor-pointer w-44 h-60 
+           bg-[#0D0D12] rounded-2xl border-[2px] border-purple-main 
+           shadow-[0_0_40px_rgba(173,71,255,0.3)] 
+           hover:shadow-[0_0_60px_rgba(173,71,255,0.5)] 
+           flex flex-col p-5 justify-between transition-shadow duration-300;
+  }
+
+  /* The bottom scrolling pool items */
+  .card-asset-pool {
+    @apply flex-shrink-0 w-40 h-32 
+           bg-[#0F1016] border border-gray-800 rounded-xl cursor-pointer p-4 
+           flex flex-col justify-between 
+           hover:bg-gray-900 transition-all duration-200;
+  }
+
+  .btn-start-simulation {
+    @apply px-12 py-4 rounded-full font-bold text-sm tracking-widest uppercase transition-all duration-300;
+  }
+  .btn-start-active {
+    @apply bg-white text-black hover:scale-105 shadow-[0_0_30px_rgba(255,255,255,0.2)];
+  }
+  .btn-start-disabled {
+    @apply bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed;
+  }
+
+
+  /* ==============================
+     // GAME PAGE STYLES //
+     ============================== */
+
+     .game-hud-container {
+      /* Changed from flex to grid-cols-3 to perfectly center the middle element */
+      @apply absolute top-0 left-0 right-0 p-8 grid grid-cols-3 items-start z-20;
+    }
+  
+    /* Explicitly align the children to ensure the center one is dead-center */
+    .game-hud-container > :first-child {
+      @apply justify-self-start;
+    }
+  
+    .game-hud-container > :nth-child(2) {
+      @apply justify-self-center;
+    }
+  
+    .game-hud-container > :last-child {
+      @apply justify-self-end;
+    }
+
+  /* The glowing orb in the center */
+  .orb-core {
+    @apply absolute z-15 w-20 h-20 rounded-full bg-[image:var(--grad-orb-purple)];
+  }
+  .orb-event {
+    @apply bg-[image:var(--grad-orb-red)] shadow-[0_0_100px_rgba(220,38,38,0.8)];
+  }
+
+  /* Event Overlay */
+  .event-overlay-title {
+    @apply text-5xl font-bold text-red-500 mb-4 drop-shadow-[0_0_10px_rgba(220,38,38,0.8)];
+  }
+  .event-overlay-text {
+    @apply text-xl text-white mb-8 font-light leading-relaxed;
+  }
+  .btn-event-action {
+    @apply px-8 py-3 bg-white text-black rounded-full font-bold hover:scale-105 transition-transform;
+  }
+  /* Allocation Tracker */
+  .allocation-tracker {
+    @apply mb-4 text-sm font-mono font-bold uppercase tracking-widest flex items-center gap-2;
+  }
+  .text-valid { @apply text-green-400; }
+  .text-invalid { @apply text-red-500; }
+    /* Bottom Controls */
+    .control-panel-container {
+      @apply absolute bottom-0 w-full bg-gradient-to-t from-black via-black/90 to-transparent pt-20 pb-5 px-5 z-20 flex flex-col items-center;
+    }
+  
+  .control-card {
+    @apply bg-gray-900 border border-gray-800 p-4 rounded-xl w-full mb-5 group-hover:border-gray-600 transition-colors;
+  }
+
+  .control-slider {
+    @apply w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer
+           -translate-y-[8px]
+           [&::-webkit-slider-thumb]:appearance-none
+           [&::-webkit-slider-thumb]:w-4
+           [&::-webkit-slider-thumb]:h-4
+           [&::-webkit-slider-thumb]:bg-purple-500
+           [&::-webkit-slider-thumb]:rounded-full
+           [&::-webkit-slider-thumb]:transition-transform
+           [&::-webkit-slider-thumb]:hover:scale-125;
+  }
+
+  .btn-execute-turn {
+    @apply px-6 py-3 -translate-y-[10px] bg-purple-600 hover:bg-purple-500 text-white rounded-full font-bold text-lg tracking-widest 
+           shadow-[0_0_40px_rgba(168,85,247,0.4)] transition-all hover:scale-105;
+  }
+
+
+  /* ==============================
+     // LEADERBOARD STYLES //
+     ============================== */
+
+  .leaderboard-title-gradient {
+    @apply text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-yellow-600;
+  }
+
+  .leaderboard-card {
+    @apply flex items-center justify-between p-4 rounded-xl border transition-all;
+  }
+  
+  .leaderboard-card-first {
+    @apply bg-yellow-900/20 border-yellow-600/50;
+  }
+  .leaderboard-card-normal {
+    @apply bg-gray-900 border-gray-800;
+  }
+  
+  .rank-badge {
+    @apply w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm;
+  }
+  .rank-badge-first {
+    @apply bg-yellow-500 text-black;
+  }
+  .rank-badge-normal {
+    @apply bg-gray-800 text-gray-400;
+  }
+
+  .self-tag {
+    @apply ml-2 text-[10px] bg-purple-600 px-2 py-0.5 rounded-full text-white;
+  }
+}
