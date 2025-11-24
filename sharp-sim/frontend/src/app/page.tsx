@@ -28,15 +28,27 @@
       const unsubscribeAuth = onAuthStateChanged(auth, (user) => { /* Auth */ });
       const configRef = doc(db, 'config', 'dailyAssets');
       const unsubscribeAssets = onSnapshot(configRef, (docSnap) => {
+        let hasData = false;
         if (docSnap.exists()) {
           const data = docSnap.data();
-          setAssets(data.assets || []);
-          if (data.lastUpdated) {
-               const d = new Date(data.lastUpdated);
-               setLastUpdated(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ET');
+          if (data.assets && data.assets.length > 0) {
+            setAssets(data.assets);
+            if (data.lastUpdated) {
+                 const d = new Date(data.lastUpdated);
+                 setLastUpdated(d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' ET');
+            }
+            hasData = true;
           }
         }
-        setLoading(false);
+        
+        if (hasData) {
+            setLoading(false);
+        } else {
+            // No data found? Automatically trigger generation while keeping loading state active
+            console.log("No assets found. Auto-triggering generation...");
+            fetch('http://127.0.0.1:5001/sharp-80263/us-central1/generate_daily_market', { mode: 'no-cors' })
+                .catch(err => console.error("Auto-generation failed:", err));
+        }
       });
       return () => { unsubscribeAuth(); unsubscribeAssets(); }
     }, []);
@@ -138,14 +150,16 @@
                       </div>
                       
                       <div>
-                          <div className="flex justify-between text-[10px] text-gray-600 mb-1 uppercase">
+                      <div className="flex justify-between text-[10px] text-gray-600 mb-1 uppercase">
                               <span>Risk</span>
                               <span>{(asset.volatility * 100).toFixed(0)}%</span>
                           </div>
-                          <div className="h-1 w-full bg-gray-800 rounded-full overflow-hidden">
+                          {/* CHANGED: Updated to use gradient mask logic like selected cards */}
+                          <div className="relative h-1 w-full bg-gray-800 rounded-full overflow-hidden">
+                              <div className="absolute top-0 left-0 h-full w-full bg-gradient-to-r from-gray-500 to-red-600" />
                               <div 
-                                  className="h-full bg-gray-500" 
-                                  style={{ width: `${Math.min(asset.volatility * 100, 100)}%` }} 
+                                  className="absolute top-0 right-0 h-full bg-gray-800" 
+                                  style={{ width: `${100 - Math.min(asset.volatility * 100, 100)}%` }} 
                               />
                           </div>
                       </div>
@@ -178,10 +192,10 @@
         </header>
   
         <div className="flex-grow flex flex-col items-center justify-center relative z-0 w-full px-4 pb-48">
-          {selectedAssets.length === 0 && !loading && !isSyncing && (
-              <div className="absolute text-gray-600 text-xl animate-pulse tracking-widest uppercase font-light">
-                  {/* CHANGED: Updated text */}
-                  SELECT 4 ASSETS
+          {/* CHANGED: Now handles loading state explicitly */}
+          {(selectedAssets.length === 0 || loading || isSyncing) && (
+              <div className="absolute text-gray-600 text-xl animate-pulse tracking-widest uppercase font-light text-center">
+                  {(loading || isSyncing) ? "LOADING TODAY'S MOST RELEVANT STOCKS..." : "SELECT 4 ASSETS"}
               </div>
           )}
   

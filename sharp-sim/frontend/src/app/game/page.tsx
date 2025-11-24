@@ -5,120 +5,144 @@
     import { motion, AnimatePresence } from 'framer-motion';
     import { simulateStep, calculateSharpeRatio } from '@/lib/math';
     import { db, auth } from '@/lib/firebase';
-    import { doc, setDoc, collection, addDoc, serverTimestamp } from 'firebase/firestore';
+    import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
     
     /* --- EVENT POOL --- */
-    // 15 Unique Events with Detailed Summaries
     const EVENT_POOL = [
       {
         id: 'evt_election',
         headline: "Surprise Election Result",
         description: "A populist candidate wins in a major economy, promising protectionism.",
+        type: 'major',
         impact: (a: any) => { a.sigma *= 1.4; a.mu -= 0.02; },
-        summary: "The unexpected victory of a populist candidate advocating for protectionist policies sent shockwaves through the global markets. Investors reacted with immediate uncertainty, causing volatility to spike by roughly 40% as capital fled to safer havens. The looming threat of new tariffs and trade barriers dampened growth expectations, leading to a broad contraction in equity prices as the market priced in a potential slowdown in international trade."
+        summary: "Unexpected populist victory caused 40% volatility spike and broad equity contraction due to tariff fears."
       },
       {
         id: 'evt_fusion',
         headline: "Nuclear Fusion Breakthrough",
         description: "Scientists achieve net energy gain, promising cheap future power.",
+        type: 'major',
         impact: (a: any) => { if(['NVDA','AMD','TSLA','GOOGL','MSFT'].includes(a.symbol)) { a.mu += 0.04; } else { a.mu += 0.01; } },
-        summary: "The announcement of a net energy gain from nuclear fusion was hailed as a turning point for humanity. This breakthrough promises a future of limitless, clean energy, drastically reducing long-term operational costs for energy-intensive industries. Tech and industrial sectors rallied significantly, anticipating a new era of efficiency and reduced overhead, while energy stocks surged on the prospect of commercializing this revolutionary technology."
+        summary: "Net energy gain achievement sparked rally in tech/industrials; energy stocks surged on commercialization prospects."
       },
       {
         id: 'evt_pandemic',
         headline: "New Viral Strain Detected",
         description: "WHO issues warning about a highly contagious respiratory virus.",
+        type: 'major',
         impact: (a: any) => { a.sigma *= 1.8; a.mu -= 0.05; a.price *= 0.92; },
-        summary: "News of a highly contagious viral strain triggered a rapid 'risk-off' sentiment across global exchanges. Memories of past lockdowns fueled panic selling, driving the market down by approximately 8% in a single session. Volatility nearly doubled as uncertainty regarding supply chain disruptions and potential quarantine measures forced investors to liquidate equity positions in favor of cash and bonds."
+        summary: "Contagious virus warning triggered 8% market drop and doubled volatility as capital fled to bonds."
       },
       {
         id: 'evt_peace',
         headline: "Historic Peace Treaty Signed",
         description: "Long-standing conflict in the Middle East comes to an end.",
+        type: 'major',
         impact: (a: any) => { a.sigma *= 0.7; a.mu += 0.02; },
-        summary: "The signing of a historic peace treaty in a volatile region brought a wave of relief to global markets. The reduction in geopolitical risk premiums led to a 30% drop in volatility, as the fear of supply shocks dissipated. Investor confidence soared, unlocking capital that had been sidelined, resulting in a steady, broad-based rally as focus shifted back to fundamental economic growth."
+        summary: "Peace treaty reduced geopolitical risk, dropping volatility by 30% and fueling a broad-based relief rally."
       },
       {
         id: 'evt_ai_reg',
         headline: "Strict AI Regulations Passed",
         description: "Global summit agrees on pausing advanced AI development.",
+        type: 'major',
         impact: (a: any) => { if(['NVDA','AMD','GOOGL','MSFT','META'].includes(a.symbol)) { a.mu -= 0.04; a.sigma *= 1.2; } },
-        summary: "The imposition of strict global AI regulations acted as a sudden brake on the overheated tech sector. Major tech giants, previously pricing in exponential unrestrained growth, faced an immediate reality check. The market repriced these assets downwards to account for slower innovation cycles and increased compliance costs, leading to a sharp rotation out of growth stocks and increased sector-specific volatility."
+        summary: "Strict AI regulations cooled the tech sector, causing a sharp rotation out of growth stocks."
       },
       {
         id: 'evt_oil_shock',
         headline: "OPEC Cuts Production",
         description: "Oil prices skyrocket as supply is artificially constrained.",
+        type: 'major',
         impact: (a: any) => { a.mu -= 0.01; a.sigma *= 1.1; }, 
-        summary: "OPEC's decision to cut production created an immediate supply deficit, sending crude prices soaring. This energy shock reverberated through the economy, increasing input costs for manufacturing and transportation. The broader market faced headwinds as profit margins squeezed, leading to a stagnation in growth and a tick up in volatility as investors grappled with the inflationary implications."
+        summary: "OPEC production cuts spiked oil prices, squeezing margins and stalling broader economic growth."
       },
       {
         id: 'evt_cyber',
         headline: "Massive Banking Cyberattack",
         description: "Major financial institutions paralyzed for 48 hours.",
+        type: 'major',
         impact: (a: any) => { if(['JPM','BAC','GS','SPY'].includes(a.symbol)) { a.price *= 0.85; a.sigma *= 2.0; } else { a.sigma *= 1.2; } },
-        summary: "A sophisticated cyberattack paralyzing major banking institutions froze the financial nervous system for 48 hours. The inability to process transactions caused a liquidity crisis and sparked systemic panic. Financial stocks plummeted by over 15% while volatility doubled, as fears of compromised data and long-term infrastructure damage drove a massive sell-off in the banking sector."
+        summary: "Banking cyberattack caused liquidity panic; financials plummeted 15% with doubled volatility."
       },
       {
         id: 'evt_tax_cut',
         headline: "Corporate Tax Cut Announced",
         description: "Government slashes rates to stimulate stagnation.",
+        type: 'major',
         impact: (a: any) => { a.mu += 0.03; a.price *= 1.05; },
-        summary: "The government's announcement of a corporate tax rate slash provided an immediate boost to bottom-line projections. Analysts rushed to upgrade earnings forecasts, fueling a 5% market-wide rally. The injection of fiscal stimulus revitalized investor appetite, shifting the narrative from stagnation to expansion as companies were expected to reinvest the savings into growth and dividends."
+        summary: "Corporate tax slash boosted earnings forecasts, driving a 5% market-wide rally."
       },
       {
         id: 'evt_semiconductor',
         headline: "Semiconductor Shortage",
         description: "Supply chain disruption halts electronics manufacturing.",
+        type: 'major',
         impact: (a: any) => { if(['NVDA','AMD','TSLA','AAPL'].includes(a.symbol)) { a.price *= 0.9; a.sigma *= 1.3; } },
-        summary: "A critical disruption in the semiconductor supply chain brought electronics manufacturing to a grinding halt. With chips being the lifeblood of modern tech, shortages led to production delays across automotive and consumer electronics. Tech stocks, particularly hardware and EV manufacturers, faced significant selling pressure as revenue guidance was slashed, driving up volatility in the sector."
+        summary: "Chip shortage halted electronics manufacturing, hitting tech and EV stocks with heavy selling pressure."
       },
       {
         id: 'evt_rate_hike',
         headline: "Central Bank Hikes Rates",
         description: "Aggressive move to curb runaway inflation.",
+        type: 'major',
         impact: (a: any) => { a.mu -= 0.03; a.price *= 0.96; },
-        summary: "The Central Bank's aggressive interest rate hike to combat runaway inflation tightened financial conditions overnight. The higher cost of capital increased borrowing costs for corporations, cooling growth prospects. Equity markets repriced lower by roughly 4% as the discount rate for future cash flows rose, signaling an end to the era of cheap money."
+        summary: "Aggressive rate hike tightened capital; markets repriced 4% lower on higher borrowing costs."
       },
       {
         id: 'evt_stimulus',
         headline: "Massive Stimulus Package",
         description: "Government prints money to avert recession.",
+        type: 'major',
         impact: (a: any) => { a.mu += 0.02; a.sigma *= 1.1; }, 
-        summary: "To avert a looming recession, the government unleashed a massive liquidity injection into the economy. While this monetary expansion prevented a credit freeze and boosted short-term growth numbers, it also sparked fears of currency debasement. The market rallied on the influx of cash, but underlying volatility increased as investors hedged against the long-term inflationary consequences of money printing."
+        summary: "Liquidity injection prevented recession and rallied markets, though inflation fears increased volatility."
       },
       {
         id: 'evt_trade_war',
         headline: "Trade War Escalates",
         description: "Superpowers impose 50% tariffs on all goods.",
+        type: 'major',
         impact: (a: any) => { a.mu -= 0.03; a.sigma *= 1.3; },
-        summary: "The escalation of trade tensions between superpowers, featuring 50% tariffs, effectively erected walls around major economies. The disruption to global free trade strangled growth forecasts, as multinational corporations faced soaring costs and restricted market access. Equities slumped and volatility rose as the market adjusted to a less efficient, fragmented global economic landscape."
+        summary: "50% tariffs strangled global trade, causing equities to slump as efficiency plummeted."
       },
       {
         id: 'evt_asteroid',
         headline: "Asteroid Mining Mission Launches",
         description: "Private company targets platinum-rich asteroid.",
+        type: 'major',
         impact: (a: any) => { if(['TSLA','SPCE','BA'].includes(a.symbol)) { a.mu += 0.05; } },
-        summary: "The launch of a credible private mission to mine a platinum-rich asteroid sparked a speculative frenzy in the aerospace sector. Investors bet heavily on the potential for a resource abundance that could crash raw material costs and open new frontiers. While speculative, this optimism drove a targeted rally in space-adjacent stocks, decoupling them from broader market trends."
+        summary: "Asteroid mining mission launched speculative frenzy, driving a targeted rally in aerospace stocks."
       },
       {
         id: 'evt_crypto',
         headline: "Major Crypto Exchange Collapse",
         description: "Fraud uncovered, billions lost in digital assets.",
+        type: 'major',
         impact: (a: any) => { if(['COIN','HOOD'].includes(a.symbol)) { a.price *= 0.7; a.sigma *= 2.5; } },
-        summary: "The collapse of a major cryptocurrency exchange due to fraud sent shockwaves through the digital asset ecosystem. The contagion effect was immediate, crashing crypto-exposed stocks by nearly 30% and spiking their volatility. Institutional trust evaporated, leading to a flight from speculative assets back to traditional fiat-based securities."
+        summary: "Crypto exchange fraud collapsed digital assets; exposed stocks crashed 30% with extreme volatility."
       },
       {
         id: 'evt_biotech',
         headline: "Cure for Alzheimer's Found",
         description: "Biotech firm announces successful Phase 3 trials.",
+        type: 'major',
         impact: (a: any) => { a.mu += 0.01; }, 
-        summary: "The confirmation of a successful cure for Alzheimer's disease in Phase 3 trials was a monumental victory for the healthcare sector. Beyond the specific firm, the breakthrough lifted overall market sentiment, viewed as a triumph of human innovation. The optimism spilled over into the broader market, providing a slight nudge to growth expectations and a stabilizing effect on volatility."
+        summary: "Alzheimer's cure success lifted healthcare sector and overall market sentiment on innovation optimism."
       }
     ];
+
+    // Helper to generate Neutral Market Updates
+    const getNeutralMarketUpdate = (portfolioChangePct: number) => {
+        if (portfolioChangePct > 5) return { headline: "Bull Market Acceleration", description: "Strong momentum carries the portfolio significantly higher as investor sentiment peaks." };
+        if (portfolioChangePct > 1) return { headline: "Steady Market Growth", description: "Indices tick upward amidst balanced trading volume and stable macroeconomic data." };
+        if (portfolioChangePct > -1) return { headline: "Market Consolidation", description: "Volatility compresses as traders await new catalysts; prices remain largely range-bound." };
+        if (portfolioChangePct > -5) return { headline: "Minor Correction", description: "Profit-taking leads to a slight pullback across major sectors; fundamentals remain intact." };
+        return { headline: "Market Pullback", description: "Bearish sentiment weighs on asset prices as risk-off behavior dominates the session." };
+    };
     
-    /* ... Types and WarpSpeed Component (unchanged) ... */
-    const WarpSpeed = ({ active, speed = 1 }: { active: boolean; speed?: number }) => {
+    /* --- COMPONENTS --- */
+
+    const WarpSpeed = ({ active, paused, speed = 1 }: { active: boolean; paused: boolean; speed?: number }) => {
         const canvasRef = useRef<HTMLCanvasElement>(null);
         useEffect(() => {
             const canvas = canvasRef.current;
@@ -133,7 +157,11 @@
             class Star {
                 x: number; y: number; z: number;
                 constructor() { this.x = Math.random() * w - w / 2; this.y = Math.random() * h - h / 2; this.z = Math.random() * 2000; }
-                update() { this.z -= 10 * speed; if (this.z <= 1) { this.z = 2000; this.x = Math.random() * w - w / 2; this.y = Math.random() * h - h / 2; } }
+                update() { 
+                    if (paused) return; 
+                    this.z -= 10 * speed; 
+                    if (this.z <= 1) { this.z = 2000; this.x = Math.random() * w - w / 2; this.y = Math.random() * h - h / 2; } 
+                }
                 draw() {
                     if (!ctx) return;
                     const sx = (this.x / this.z) * 500 + w / 2; const sy = (this.y / this.z) * 500 + h / 2;
@@ -152,11 +180,10 @@
             };
             render();
             return () => { window.removeEventListener('resize', handleResize); cancelAnimationFrame(animationFrameId); };
-        }, [active, speed]);
+        }, [active, paused, speed]);
         return <canvas ref={canvasRef} className="absolute inset-0 z-0 pointer-events-none" />;
     };
     
-    // --- SVG LINE GRAPH COMPONENT ---
     const PortfolioLineGraph = ({ history }: { history: number[] }) => {
         if (!history || history.length < 1) return <div className="w-full h-full bg-gray-900/20 rounded" />;
         
@@ -164,7 +191,6 @@
         const max = Math.max(...history, 1000000) * 1.01;
         const range = max - min || 1;
         
-        // Generate points for the line
         const points = history.map((val, i) => {
             const x = (i / (Math.max(history.length - 1, 1))) * 100; 
             const y = 100 - ((val - min) / range) * 100; 
@@ -172,7 +198,7 @@
         }).join(' ');
     
         const isProfit = history[history.length - 1] >= 1000000;
-        const color = isProfit ? '#4ade80' : '#f87171'; // green-400 or red-400
+        const color = isProfit ? '#4ade80' : '#f87171'; 
     
         return (
             <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -182,20 +208,8 @@
                         <stop offset="100%" stopColor={color} stopOpacity="0" />
                     </linearGradient>
                 </defs>
-                <path 
-                    d={`M 0,100 ${points.split(' ').map(p => 'L ' + p).join(' ')} L 100,100 Z`} 
-                    fill="url(#lineGrad)" 
-                    stroke="none" 
-                />
-                <polyline 
-                    points={points} 
-                    fill="none" 
-                    stroke={color} 
-                    strokeWidth="2" 
-                    vectorEffect="non-scaling-stroke"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                />
+                <path d={`M 0,100 ${points.split(' ').map(p => 'L ' + p).join(' ')} L 100,100 Z`} fill="url(#lineGrad)" stroke="none" />
+                <polyline points={points} fill="none" stroke={color} strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
         );
     };
@@ -206,15 +220,32 @@
       const [loading, setLoading] = useState(true);
       const [gameState, setGameState] = useState<any | null>(null); 
       const [allocations, setAllocations] = useState<Record<string, number>>({});
-      const [eventMsg, setEventMsg] = useState<any | null>(null);
-      const [gameSpeed, setGameSpeed] = useState(1);
       
-      // New State for Events
+      // Game State
+      const [isSimulating, setIsSimulating] = useState(false);
+      const [eventMsg, setEventMsg] = useState<any | null>(null);
       const [availableEvents, setAvailableEvents] = useState([...EVENT_POOL]);
       const [eventHistory, setEventHistory] = useState<any[]>([]);
+      const [priceChanges, setPriceChanges] = useState<Record<string, { direction: 'up' | 'down' | 'same', pct: number }>>({});
+      const [flashing, setFlashing] = useState(false);
+
+      // Visual History for the graph (High Resolution)
+      const [visualHistory, setVisualHistory] = useState<number[]>([]);
+
+      // Date State
+      const [startDate] = useState(new Date());
+      const [rapidDate, setRapidDate] = useState<Date | null>(null); 
     
       const router = useRouter();
     
+      // Flash Effect Timer
+      useEffect(() => {
+        if (flashing) {
+            const timer = setTimeout(() => setFlashing(false), 500);
+            return () => clearTimeout(timer);
+        }
+      }, [flashing]);
+
       useEffect(() => {
         const initGame = async () => {
           const tickers = searchParams.get('tickers')?.split(',') || [];
@@ -225,13 +256,16 @@
             });
             const data = await response.json();
             if (data.error) throw new Error(data.error);
+            
+            data.max_turns = 10;
             setGameState({ ...data, history: [data.cash] });
+            setVisualHistory([data.cash]); 
+            
             const initialAlloc: Record<string, number> = {};
-            tickers.forEach((t: string) => { 
-                initialAlloc[t] = Math.floor(100 / tickers.length);
-            });
+            tickers.forEach((t: string) => { initialAlloc[t] = Math.floor(100 / tickers.length); });
             setAllocations(initialAlloc);
             setLoading(false);
+            setRapidDate(new Date()); 
           } catch (err) { console.error(err); }
         };
         initGame();
@@ -243,74 +277,158 @@
         Object.values(gameState.portfolio).forEach((a: any) => val += a.price * a.shares);
         return val;
       };
+
+      // CHANGED: Now accepts a Date object to support live updates during simulation
+      const getMajorDateDisplayFromDate = (d: Date) => {
+        const month = d.toLocaleString('default', { month: 'short' });
+        const year = d.getFullYear();
+        const quarter = Math.floor((d.getMonth() + 3) / 3); 
+        return `Q${quarter} ${month} ${year}`;
+      };
+
+      const getMinorDateDisplay = (dateObj: Date) => {
+        return dateObj.toLocaleDateString('en-GB');
+      };
     
-      const handleNextTurn = () => {
-        if (!gameState) return;
+      // --- MAIN EXECUTION LOGIC ---
+      const handleExecuteTurn = () => {
+        if (!gameState || isSimulating) return;
         
+        setIsSimulating(true); 
+        setEventMsg(null); 
+
+        // 1. Rebalance Portfolio First
         let currentTotalValue = gameState.cash;
         Object.entries(gameState.portfolio).forEach(([_, data]: any) => currentTotalValue += data.shares * data.price);
-        
-        const newPortfolio = JSON.parse(JSON.stringify(gameState.portfolio)); // Deep Clone
+        const prevPortfolioValue = currentTotalValue; 
+
+        const newPortfolio = JSON.parse(JSON.stringify(gameState.portfolio));
         let remainingCash = currentTotalValue;
         
-        // 1. Rebalance
         Object.keys(newPortfolio).forEach(ticker => {
             const targetPct = (allocations[ticker] || 0) / 100;
             const targetValue = currentTotalValue * targetPct;
             newPortfolio[ticker].shares = targetValue / newPortfolio[ticker].price;
             remainingCash -= targetValue;
         });
-    
-        // 2. Check for Events (Turns 5, 10, 15, 19)
+
+        // 2. Prepare for Simulation
         const nextTurn = gameState.turn + 1;
+        const startSimDate = new Date(startDate);
+        startSimDate.setMonth(startSimDate.getMonth() + (gameState.turn * 6));
+        
         let currentEvent = null;
-    
-        if ([5, 10, 15, 19].includes(nextTurn) && availableEvents.length > 0) {
+        const isMajorTurn = [2, 4, 6, 8].includes(nextTurn); 
+
+        if (isMajorTurn && availableEvents.length > 0) {
             const idx = Math.floor(Math.random() * availableEvents.length);
             const evt = availableEvents[idx];
-            
-            // Remove used event
             const newAvailable = [...availableEvents];
             newAvailable.splice(idx, 1);
             setAvailableEvents(newAvailable);
-    
-            // Apply Impact
-            Object.values(newPortfolio).forEach((asset: any) => evt.impact(asset));
             
-            // Record History
+            Object.values(newPortfolio).forEach((asset: any) => evt.impact(asset));
+            currentEvent = evt;
+            
             const historyItem = { turn: nextTurn, ...evt };
             setEventHistory([...eventHistory, historyItem]);
+        }
+
+        // 3. Run Progressive Simulation Loop
+        const DURATION = 5000; 
+        const TOTAL_DAYS = 126; 
+        const dt = 1/252; 
+        const UPDATE_INTERVAL = 100; // CHANGED: 100ms for both graph and prices
+        
+        let dayCount = 0;
+        const startTime = Date.now();
+
+        const simInterval = setInterval(() => {
+            const now = Date.now();
+            const elapsed = now - startTime;
+            const progress = Math.min(elapsed / DURATION, 1);
             
-            currentEvent = evt;
-        }
-    
-        // 3. Simulate
-        const dt = 1/252; const daysPerTurn = 63; 
-        for (let day = 0; day < daysPerTurn; day++) {
-            Object.keys(newPortfolio).forEach(ticker => {
-                const asset = newPortfolio[ticker];
-                asset.price = simulateStep(asset.price, asset.mu, asset.sigma, dt);
-            });
-        }
-    
-        // 4. Calculate Result
-        let newVal = remainingCash;
-        Object.values(newPortfolio).forEach((a: any) => newVal += a.price * a.shares);
-        
-        // 5. Update State
-        setEventMsg(currentEvent); // Show modal if event happened
-        setGameState({ 
-            ...gameState, 
-            cash: remainingCash, 
-            portfolio: newPortfolio, 
-            turn: nextTurn, 
-            history: [...gameState.history, newVal] 
-        });
-        
-        if (currentEvent) setGameSpeed(0); else setGameSpeed(1);
+            // A. Calculate days passed
+            const targetDay = Math.floor(progress * TOTAL_DAYS);
+            const daysToSimulate = targetDay - dayCount;
+
+            // B. Run Math
+            if (daysToSimulate > 0) {
+                for (let i = 0; i < daysToSimulate; i++) {
+                    Object.keys(newPortfolio).forEach(ticker => {
+                        const asset = newPortfolio[ticker];
+                        asset.price = simulateStep(asset.price, asset.mu, asset.sigma, dt);
+                    });
+                }
+                dayCount = targetDay;
+            }
+
+            // C. Update Rapid Date
+            const timeDiff = (1000 * 60 * 60 * 24 * TOTAL_DAYS); 
+            const currentDate = new Date(startSimDate.getTime() + (timeDiff * progress));
+            setRapidDate(currentDate);
+
+            // D. Calculate Current Value
+            let tempVal = remainingCash;
+            Object.values(newPortfolio).forEach((a: any) => tempVal += a.price * a.shares);
+
+            // E. Update Visual State (Both Graph & Prices update every 100ms tick)
+            setVisualHistory(prev => [...prev, tempVal]);
+            setGameState((prev: any) => ({
+                ...prev,
+                portfolio: newPortfolio, 
+                // Sync official history with visual temporarily for graph coherence
+                history: [...prev.history.slice(0, prev.turn + 1), tempVal] 
+            }));
+
+            // F. End Condition
+            if (progress >= 1) {
+                clearInterval(simInterval);
+                finalizeTurn(newPortfolio, remainingCash, currentEvent, prevPortfolioValue, nextTurn);
+            }
+        }, UPDATE_INTERVAL); // Changed to 100ms
       };
-    
-      const handleContinue = () => { setEventMsg(null); setGameSpeed(1); };
+
+      const finalizeTurn = (finalPortfolio: any, finalCash: number, event: any, prevValue: number, nextTurn: number) => {
+            const newChanges: Record<string, { direction: 'up' | 'down' | 'same', pct: number }> = {};
+            Object.keys(finalPortfolio).forEach(ticker => {
+                const oldPrice = gameState.portfolio[ticker].price; 
+                const newPrice = finalPortfolio[ticker].price;
+                const delta = newPrice - oldPrice;
+                const pct = (delta / oldPrice) * 100;
+                newChanges[ticker] = {
+                    direction: delta > 0 ? 'up' : delta < 0 ? 'down' : 'same',
+                    pct: Math.abs(pct)
+                };
+            });
+            setPriceChanges(newChanges);
+            setFlashing(true);
+
+            let finalVal = finalCash;
+            Object.values(finalPortfolio).forEach((a: any) => finalVal += a.price * a.shares);
+
+            let messagePayload = null;
+            if (event) {
+                messagePayload = { ...event };
+            } else {
+                const pctChange = ((finalVal - prevValue) / prevValue) * 100;
+                messagePayload = { type: 'neutral', ...getNeutralMarketUpdate(pctChange) };
+            }
+
+            setEventMsg(messagePayload); 
+            
+            setGameState((prev: any) => ({ 
+                ...prev, 
+                cash: finalCash, 
+                portfolio: finalPortfolio, 
+                turn: nextTurn, 
+                history: [...prev.history, finalVal] 
+            }));
+            
+            setVisualHistory(prev => [...prev, finalVal]);
+
+            setIsSimulating(false);
+      };
     
       if (loading) return <div className="h-screen bg-black text-white flex items-center justify-center">Initializing Quant Engine...</div>;
     
@@ -318,23 +436,68 @@
       const prevVal = gameState?.history[gameState.history.length - 2] || 1000000;
       const isProfit = totalVal >= prevVal;
       const totalAllocation = Object.values(allocations).reduce((sum, val) => sum + val, 0);
+      const isTurnZero = gameState?.turn === 0;
     
       return (
         <main className="h-screen bg-black text-white overflow-hidden relative font-sans flex flex-col items-center justify-center">
           
-          <WarpSpeed active={!eventMsg && (gameState?.turn || 0) < 20} speed={gameSpeed} />
-          
-          <motion.div 
-            animate={{ scale: eventMsg ? 1.2 : 1 }}
-            transition={{ duration: 0.5 }}
-            className={`orb-core ${eventMsg ? 'orb-event' : ''}`}
+          <WarpSpeed 
+            active={!isTurnZero && (gameState?.turn || 0) < 10} 
+            paused={!isSimulating} 
+            speed={1.5} 
           />
+          
+          <div className="absolute z-10 flex flex-col items-center justify-center">
+             {/* CHANGED: Increased bottom margin (mb-80) to push text higher */}
+             {isTurnZero && !isSimulating && (
+                 <div className="mb-80 text-center animate-pulse">
+                     <div className="text-purple-300 uppercase tracking-[0.2em] text-lg font-bold bg-black/50 px-6 py-3 rounded-full border border-purple-500/50 shadow-[0_0_20px_rgba(168,85,247,0.4)] backdrop-blur-sm">
+                         Allocate & Diversify Below
+                     </div>
+                 </div>
+             )}
+
+             <AnimatePresence mode="wait">
+                {eventMsg ? (
+                    <motion.div 
+                        key="event-card"
+                        initial={{ opacity: 0, scale: 0.8 }} 
+                        animate={{ opacity: 1, scale: 1 }} 
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className={`text-center max-w-lg p-8 rounded-2xl border backdrop-blur-xl shadow-2xl 
+                            ${eventMsg.type === 'major' 
+                                ? 'bg-black/90 border-red-500/50 shadow-red-900/20' 
+                                : 'bg-gray-900/90 border-blue-500/30 shadow-blue-900/20'
+                            }`}
+                    >
+                        <div className={`text-xs uppercase tracking-widest mb-2 font-bold 
+                            ${eventMsg.type === 'major' ? 'text-red-400' : 'text-blue-400'}`}>
+                            {/* CHANGED: Use rapidDate/getMajorDateDisplayFromDate here too? 
+                                Actually, event happens AT the turn end, so gameState.turn is correct, 
+                                but we need the function that takes a turn number. 
+                                Wait, the turn number increases AFTER finalize. 
+                                Let's stick to the existing helper for static turn-based dates here. */}
+                            {eventMsg.type === 'major' ? 'Breaking News' : 'Market Update'} • {getMajorDateDisplayFromDate(rapidDate || startDate)}
+                        </div>
+                        <h2 className="text-3xl font-bold text-white mb-4 leading-tight">{eventMsg.headline}</h2>
+                        <p className="text-md text-gray-300 leading-relaxed">{eventMsg.description}</p>
+                    </motion.div>
+                ) : (
+                    <motion.div 
+                        key="orb"
+                        animate={{ scale: isSimulating ? [1, 1.05, 1] : 1 }} 
+                        transition={{ duration: 2, repeat: isSimulating ? Infinity : 0 }}
+                        className="orb-core"
+                    />
+                )}
+             </AnimatePresence>
+          </div>
     
           <div className="game-hud-container">
             <div className="flex flex-col h-full justify-start w-48">
                  <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">Portfolio History</div>
                  <div className="h-12 w-full relative">
-                     <PortfolioLineGraph history={gameState?.history || []} />
+                     <PortfolioLineGraph history={visualHistory} />
                  </div>
             </div>
     
@@ -344,36 +507,20 @@
                     ${totalVal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                 </div>
             </div>
+
             <div className="text-right">
-                <div className="text-xs text-gray-400 uppercase tracking-widest mb-1">Turn</div>
-                <div className="text-4xl font-bold text-white">
-                    {gameState?.turn} <span className="text-gray-600 text-2xl">/ 20</span>
+                <div className="text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-1">
+                    Turn {gameState?.turn} / 10
+                </div>
+                <div className="text-2xl font-bold text-white tracking-tight">
+                    {/* CHANGED: Now uses rapidDate to count up the Quarter/Month/Year */}
+                    {getMajorDateDisplayFromDate(rapidDate || startDate)}
+                </div>
+                <div className="text-sm font-mono text-purple-400 mt-1">
+                    {rapidDate ? getMinorDateDisplay(rapidDate) : getMinorDateDisplay(startDate)}
                 </div>
             </div>
           </div>
-    
-          <AnimatePresence>
-              {eventMsg && (
-                <motion.div 
-                    initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.9 }}
-                    className="absolute z-30 text-center max-w-xl bg-black/80 p-8 rounded-2xl border border-red-500/50 backdrop-blur-xl"
-                >
-                    <div className="text-xs text-red-400 uppercase tracking-widest mb-2">Breaking News • Turn {gameState.turn}</div>
-                    <h2 className="event-overlay-title text-4xl mb-4">{eventMsg.headline}</h2>
-                    <p className="text-lg text-gray-300 mb-6 leading-relaxed">{eventMsg.description}</p>
-                    
-                    {/* HIDDEN SUMMARY IN GAME - Will only show in Leaderboard */}
-                    {/* <div className="bg-red-900/20 border border-red-500/30 p-3 rounded mb-6 text-sm text-red-200 font-mono">
-                        ANALYSIS: {eventMsg.summary}
-                    </div> 
-                    */}
-    
-                    <div className="flex gap-4 justify-center">
-                        <button onClick={handleContinue} className="btn-event-action">Acknowledge & Trade</button>
-                    </div>
-                </motion.div>
-              )}
-          </AnimatePresence>
     
           <div className="control-panel-container">
              <div className={`allocation-tracker ${totalAllocation === 100 ? 'text-valid' : 'text-invalid'}`}>
@@ -381,47 +528,77 @@
              </div>
     
              <div className="flex gap-6 mb-8 w-full max-w-5xl overflow-x-auto no-scrollbar justify-center">
-                {Object.keys(gameState!.portfolio).map(ticker => (
-                    <div key={ticker} className="flex flex-col items-center min-w-[100px] group">
-                        <div className="control-card">
-                            <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                <span className="font-bold text-white">{ticker}</span>
-                                <span>${gameState!.portfolio[ticker].price.toFixed(0)}</span>
+                {Object.keys(gameState!.portfolio).map(ticker => {
+                    const change = priceChanges[ticker] || { direction: 'same', pct: 0 };
+                    const isUp = change.direction === 'up';
+                    const isDown = change.direction === 'down';
+                    
+                    const priceStyle = flashing 
+                        ? (isUp ? 'text-green-400 scale-110' : isDown ? 'text-red-400 scale-110' : 'text-gray-400')
+                        : 'text-gray-400';
+
+                    const pctColor = isUp ? 'text-green-400' : isDown ? 'text-red-400' : 'text-gray-600';
+                    const arrow = isUp ? '▲' : isDown ? '▼' : '';
+
+                    // CHANGED: Decreased alpha from 0.5 (implied) to 0.2
+                    const cardGlow = isTurnZero 
+                        ? "ring-2 ring-inset ring-purple-400 shadow-[0_0_40px_rgba(192,132,252,0.2)] bg-purple-900/10" 
+                        : "";
+
+                    return (
+                        <div key={ticker} className="flex flex-col items-center min-w-[100px] group">
+                            <div className={`control-card transition-all duration-500 ${cardGlow}`}>
+                                <div className="flex justify-between text-xs mb-1 text-gray-400">
+                                    <span className="font-bold text-white">{ticker}</span>
+                                    <span className={`font-mono font-bold transition-all duration-300 ${priceStyle}`}>
+                                        ${gameState!.portfolio[ticker].price.toFixed(0)}
+                                    </span>
+                                </div>
+                                
+                                <div className="flex justify-between items-end">
+                                    <div className="font-mono text-purple-400 text-lg font-bold">
+                                        {allocations[ticker]}%
+                                    </div>
+                                    <div className={`text-[10px] font-mono mb-1 flex items-center justify-end gap-1 ${pctColor}`}>
+                                        {change.direction !== 'same' && <span>{arrow}</span>}
+                                        {change.pct.toFixed(2)}%
+                                    </div>
+                                </div>
                             </div>
-                            <div className="font-mono text-purple-400 text-lg font-bold">{allocations[ticker]}%</div>
+                            <input 
+                                type="range" min="0" max="100" value={allocations[ticker]}
+                                disabled={isSimulating} 
+                                aria-label={`Allocation percentage for ${ticker}`}
+                                onChange={(e) => setAllocations({...allocations, [ticker]: parseInt(e.target.value)})}
+                                className={`control-slider ${isSimulating ? 'opacity-50 cursor-not-allowed' : ''}`}
+                            />
                         </div>
-                        <input 
-                            type="range" min="0" max="100" value={allocations[ticker]}
-                            aria-label={`Allocation percentage for ${ticker}`}
-                            onChange={(e) => setAllocations({...allocations, [ticker]: parseInt(e.target.value)})}
-                            className="control-slider"
-                        />
-                    </div>
-                ))}
+                    );
+                })}
              </div>
     
-             {!eventMsg && gameState!.turn < 20 && (
+             {gameState!.turn < 10 && (
                  <button 
-                    onClick={handleNextTurn} 
-                    disabled={totalAllocation !== 100}
+                    onClick={handleExecuteTurn} 
+                    disabled={totalAllocation !== 100 || isSimulating}
                     className={`
                         btn-execute-turn 
-                        ${totalAllocation !== 100 ? 'opacity-50 cursor-not-allowed hover:scale-100 shadow-none' : ''}
+                        ${(totalAllocation !== 100 || isSimulating) ? 'opacity-50 cursor-not-allowed hover:scale-100 shadow-none' : ''}
                     `}
                  >
-                    EXECUTE TURN
+                    {isSimulating ? "SIMULATING MARKET..." : (gameState!.turn === 0 ? "BEGIN" : "EXECUTE TURN")}
                  </button>
              )}
     
-             {gameState!.turn >= 20 && (
+             {gameState!.turn >= 10 && (
                  <div className="text-2xl font-bold text-green-400 animate-pulse">SIMULATION COMPLETE</div>
              )}
           </div>
     
-          {gameState!.turn >= 20 && (
+          {gameState!.turn >= 10 && (
             <GameOverModal 
                 history={gameState!.history} 
-                eventHistory={eventHistory} // Pass history to save
+                eventHistory={eventHistory} 
                 onRestart={() => router.push('/')} 
             />
           )}
@@ -440,7 +617,6 @@
             if (!username) return;
             setSaving(true);
             try {
-                // SANITIZE: Remove 'impact' function from each event before saving
                 const sanitizedEvents = eventHistory?.map((evt: any) => {
                     const { impact, ...cleanEvent } = evt;
                     return cleanEvent;
@@ -453,7 +629,7 @@
                     finalPortfolioValue: finalValue, 
                     date: serverTimestamp(), 
                     gameDate,
-                    eventHistory: sanitizedEvents // Save sanitized version
+                    eventHistory: sanitizedEvents 
                 });
                 setSaved(true);
             } catch (err) { console.error(err); } finally { setSaving(false); }
@@ -477,4 +653,3 @@
     }
     
     export default function Game() { return <Suspense fallback={null}><GameContent /></Suspense> }
-    
