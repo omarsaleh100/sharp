@@ -16,8 +16,6 @@ import concurrent.futures  # <--- ADD THIS
 if not firebase_admin._apps:
     firebase_admin.initialize_app()
 
-db = firestore.client()
-
 # --- CONFIGURATION ---
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if GEMINI_API_KEY:
@@ -197,9 +195,17 @@ def calculate_market_params(tickers):
     return results, corr_matrix
 
 # --- 2. THE DAILY JOB (HTTP Trigger) ---
-@https_fn.on_request()
+@https_fn.on_request(
+    cors=options.CorsOptions(
+        cors_origins="*", 
+        cors_methods=["GET", "POST"]
+    ),
+    timeout_sec=300
+)
 def generate_daily_market(req: https_fn.Request) -> https_fn.Response:
-    # ... (Same as your existing code)
+    # Initialize DB here (Lazy Load)
+    db = firestore.client()
+    
     print("Generating daily market assets...")
     
     candidate_pool = [
@@ -264,8 +270,8 @@ def generate_daily_market(req: https_fn.Request) -> https_fn.Response:
         cors_origins="*", 
         cors_methods=["GET", "POST"]
     ),
-    timeout_sec=300, # <--- OPTIONAL: Explicitly increase timeout
-    memory=512       # <--- OPTIONAL: Increase memory if threads are heavy
+    timeout_sec=300,
+    memory=512
 )
 def start_simulation(req: https_fn.Request) -> https_fn.Response:
     if req.method == 'OPTIONS':
@@ -278,12 +284,12 @@ def start_simulation(req: https_fn.Request) -> https_fn.Response:
         if not selected_tickers:
             return https_fn.Response(json.dumps({"error": "No tickers"}), status=400)
 
-        # Call the optimized function
+        # Call the math engine
         market_data, correlation = calculate_market_params(selected_tickers)
         
         game_state = {
             "turn": 0,
-            "max_turns": 20,
+            "max_turns": 10, # Adjusted to match your frontend
             "cash": 1000000,
             "portfolio": {
                 ticker: {

@@ -35,6 +35,11 @@
     overflow-x: hidden;
   }
   
+  /* --- CUSTOM SCROLLBARS --- */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: #000000; }
+  ::-webkit-scrollbar-thumb { background: #222; border-radius: 2px; }
+  
   /* --- UTILITIES --- */
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
@@ -51,42 +56,49 @@
        ============================== */
     
     .home-header {
-      @apply w-full py-6 text-center z-10 shrink-0;
+      /* Reduced py-4 to py-2 for mobile */
+      @apply w-full py-2 md:py-6 z-10 shrink-0 relative flex flex-col items-center justify-center;
     }
   
     .home-title {
-      @apply text-5xl font-bold mb-2 text-blue-main tracking-tight;
+      @apply text-3xl md:text-5xl font-bold mb-0 md:mb-2 text-blue-main tracking-tight;
     }
   
     .btn-refresh {
-      @apply text-[10px] uppercase tracking-wider flex items-center gap-2 px-3 py-1 rounded 
+      @apply text-[8px] md:text-[10px] uppercase tracking-wider flex items-center gap-2 px-3 py-1 rounded 
              bg-gray-900 border border-gray-800 text-gray-main 
              hover:text-white hover:border-gray-600 transition-colors;
     }
-  
-    /* The selected assets grid items */
-    /* REMOVED 'group' from here */
-    .card-asset-selected {
-      @apply relative cursor-pointer w-44 h-60 
-             bg-[#0D0D12] rounded-2xl border-[2px] border-purple-main 
-             shadow-[0_0_40px_rgba(173,71,255,0.3)] 
-             hover:shadow-[0_0_60px_rgba(173,71,255,0.5)] 
-             flex flex-col p-5 justify-between transition-shadow duration-300;
+
+    .btn-profile {
+      @apply absolute right-4 top-3 md:right-8 md:top-8 px-3 py-1.5 md:px-4 md:py-2 rounded-full bg-gray-900 border border-gray-700 
+             flex items-center justify-center hover:bg-gray-800 transition-all z-50
+             text-[10px] md:text-sm font-bold text-gray-400 hover:text-white hover:border-purple-500 w-auto;
     }
   
-    /* The bottom scrolling pool items */
+    /* COMPACT SELECTED CARD FOR MOBILE */
+    .card-asset-selected {
+      @apply relative cursor-pointer 
+             w-28 h-36 md:w-44 md:h-60  /* Shrink width/height significantly on mobile */
+             bg-[#0D0D12] rounded-xl md:rounded-2xl border-[1.5px] md:border-[2px] border-purple-main 
+             shadow-[0_0_20px_rgba(173,71,255,0.2)] md:shadow-[0_0_40px_rgba(173,71,255,0.3)]
+             flex flex-col p-3 md:p-5 justify-between transition-shadow duration-300;
+    }
+  
+    /* COMPACT POOL CARD FOR MOBILE */
     .card-asset-pool {
-      @apply flex-shrink-0 w-40 h-32 
-             bg-[#0F1016] border border-gray-800 rounded-xl cursor-pointer p-4 
+      @apply flex-shrink-0 
+             w-24 h-24 md:w-40 md:h-32 /* Smaller square on mobile */
+             bg-[#0F1016] border border-gray-800 rounded-lg md:rounded-xl cursor-pointer p-2 md:p-4 
              flex flex-col justify-between 
              hover:bg-gray-900 transition-all duration-200;
     }
   
     .btn-start-simulation {
-      @apply px-12 py-4 rounded-full font-bold text-sm tracking-widest uppercase transition-all duration-300;
+      @apply px-6 py-3 md:px-12 md:py-4 rounded-full font-bold text-[10px] md:text-sm tracking-widest uppercase transition-all duration-300;
     }
     .btn-start-active {
-      @apply bg-white text-black hover:scale-105 shadow-[0_0_30px_rgba(255,255,255,0.2)];
+      @apply bg-white text-black hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.2)];
     }
     .btn-start-disabled {
       @apply bg-gray-900 text-gray-600 border border-gray-800 cursor-not-allowed;
@@ -98,62 +110,52 @@
        ============================== */
   
        .game-hud-container {
-        /* Changed from flex to grid-cols-3 to perfectly center the middle element */
-        @apply absolute top-0 left-0 right-0 p-8 grid grid-cols-3 items-start z-20;
+        /* Reduced padding p-2 to pull it to edges */
+        @apply absolute top-0 left-0 right-0 p-2 md:p-8 grid grid-cols-3 items-start z-20 pointer-events-none gap-1;
       }
     
-      /* Explicitly align the children to ensure the center one is dead-center */
-      .game-hud-container > :first-child {
-        @apply justify-self-start;
-      }
-    
-      .game-hud-container > :nth-child(2) {
-        @apply justify-self-center;
-      }
-    
-      .game-hud-container > :last-child {
-        @apply justify-self-end;
-      }
+      .game-hud-container > :first-child { @apply justify-self-start pointer-events-auto; }
+      .game-hud-container > :nth-child(2) { @apply justify-self-center pointer-events-auto; }
+      .game-hud-container > :last-child { @apply justify-self-end pointer-events-auto; }
   
-    /* The glowing orb in the center */
     .orb-core {
-      @apply absolute z-15 w-20 h-20 rounded-full bg-[image:var(--grad-orb-purple)];
+      @apply absolute z-0 w-12 h-12 md:w-20 md:h-20 rounded-full bg-[image:var(--grad-orb-purple)];
     }
+    
     .orb-event {
       @apply bg-[image:var(--grad-orb-red)] shadow-[0_0_100px_rgba(220,38,38,0.8)];
     }
   
-    /* Event Overlay */
     .event-overlay-title {
-      @apply text-5xl font-bold text-red-500 mb-4 drop-shadow-[0_0_10px_rgba(220,38,38,0.8)];
+      @apply text-xl md:text-5xl font-bold text-red-500 mb-2 md:mb-4 drop-shadow-[0_0_10px_rgba(220,38,38,0.8)];
     }
     .event-overlay-text {
-      @apply text-xl text-white mb-8 font-light leading-relaxed;
+      @apply text-xs md:text-xl text-white mb-3 md:mb-8 font-light leading-relaxed;
     }
-    .btn-event-action {
-      @apply px-8 py-3 bg-white text-black rounded-full font-bold hover:scale-105 transition-transform;
-    }
-    /* Allocation Tracker */
+    
     .allocation-tracker {
-      @apply mb-4 text-sm font-mono font-bold uppercase tracking-widest flex items-center gap-2;
+      @apply mb-1 md:mb-4 text-[10px] md:text-sm font-mono font-bold uppercase tracking-widest flex items-center gap-2;
     }
     .text-valid { @apply text-green-400; }
     .text-invalid { @apply text-red-500; }
-      /* Bottom Controls */
-      .control-panel-container {
-        @apply absolute bottom-0 w-full bg-gradient-to-t from-black via-black/90 to-transparent pt-20 pb-5 px-5 z-20 flex flex-col items-center;
-      }
+    
+    /* COMPACT BOTTOM CONTROL PANEL */
+    .control-panel-container {
+      @apply absolute bottom-0 w-full bg-gradient-to-t from-black via-black/95 to-transparent 
+             pt-4 md:pt-20 pb-2 md:pb-5 px-2 md:px-5 z-20 flex flex-col items-center;
+    }
     
     .control-card {
-      @apply bg-gray-900 border border-gray-800 p-4 rounded-xl w-full mb-5 group-hover:border-gray-600 transition-colors;
+      /* Reduced padding and margin for tighter fit */
+      @apply bg-gray-900 border border-gray-800 p-2 md:p-4 rounded-lg md:rounded-xl w-full mb-2 md:mb-5 group-hover:border-gray-600 transition-colors;
     }
   
     .control-slider {
       @apply w-full h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer
-             -translate-y-[8px]
+             -translate-y-[4px] md:-translate-y-[8px]
              [&::-webkit-slider-thumb]:appearance-none
-             [&::-webkit-slider-thumb]:w-4
-             [&::-webkit-slider-thumb]:h-4
+             [&::-webkit-slider-thumb]:w-3 md:[&::-webkit-slider-thumb]:w-4
+             [&::-webkit-slider-thumb]:h-3 md:[&::-webkit-slider-thumb]:h-4
              [&::-webkit-slider-thumb]:bg-purple-500
              [&::-webkit-slider-thumb]:rounded-full
              [&::-webkit-slider-thumb]:transition-transform
@@ -161,8 +163,8 @@
     }
   
     .btn-execute-turn {
-      @apply px-6 py-3 -translate-y-[10px] bg-purple-600 hover:bg-purple-500 text-white rounded-full font-bold text-lg tracking-widest 
-             shadow-[0_0_40px_rgba(168,85,247,0.4)] transition-all hover:scale-105;
+      @apply px-6 py-2 md:px-6 md:py-3 -translate-y-[0px] md:-translate-y-[10px] bg-purple-600 hover:bg-purple-500 text-white rounded-full font-bold text-xs md:text-lg tracking-widest 
+             shadow-[0_0_20px_rgba(168,85,247,0.4)] transition-all hover:scale-105;
     }
   
   
@@ -175,7 +177,7 @@
     }
   
     .leaderboard-card {
-      @apply flex items-center justify-between p-4 rounded-xl border transition-all;
+      @apply flex items-center justify-between p-3 md:p-4 rounded-xl border transition-all;
     }
     
     .leaderboard-card-first {
@@ -186,7 +188,7 @@
     }
     
     .rank-badge {
-      @apply w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm;
+      @apply w-6 h-6 md:w-8 md:h-8 flex items-center justify-center rounded-full font-bold text-xs md:text-sm;
     }
     .rank-badge-first {
       @apply bg-yellow-500 text-black;
@@ -196,7 +198,10 @@
     }
   
     .self-tag {
-      @apply ml-2 text-[10px] bg-purple-600 px-2 py-0.5 rounded-full text-white;
+      @apply ml-2 text-[8px] md:text-[10px] bg-purple-600 px-1.5 py-0.5 rounded-full text-white;
+    }
+
+    .leaderboard-list {
+      @apply space-y-2 md:space-y-3 overflow-y-auto pr-1 max-h-[60vh] md:max-h-[70vh];
     }
   }
-  

@@ -20,18 +20,18 @@ const auth = getAuth(app);
 const storage = getStorage(app);
 const functions = getFunctions(app);
 
-// --- CRITICAL: Connect to Emulators in Dev Mode ---
-if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
-  console.log("🔌 Connecting to Firebase Emulators...");
-  
-  // Firestore (Port 8080)
-  connectFirestoreEmulator(db, '127.0.0.1', 8080);
-  
-  // Auth (Port 9099) - ADDED { disableWarnings: true }
-  connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
-  
-  // Functions (Port 5001)
-  connectFunctionsEmulator(functions, '127.0.0.1', 5001);
-}
+// --- EMULATOR CONNECTION DISABLED FOR PRODUCTION ---
+// if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+//   console.log("🔌 Connecting to Firebase Emulators...");
+//   
+//   // Firestore (Port 8080)
+//   connectFirestoreEmulator(db, '127.0.0.1', 8080);
+//   
+//   // Auth (Port 9099)
+//   connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+//   
+//   // Functions (Port 5001)
+//   connectFunctionsEmulator(functions, '127.0.0.1', 5001);
+// }
 
 export { app, db, auth, storage, functions, GoogleAuthProvider };
