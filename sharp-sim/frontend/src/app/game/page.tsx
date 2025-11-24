@@ -370,11 +370,11 @@ function GameContent() {
   const showOrb = warpActive;
 
   return (
-    <main className="h-screen bg-black text-white overflow-hidden relative font-sans flex flex-col items-center justify-center">
+    <main className="fixed inset-0 w-full h-[100dvh] bg-black text-white overflow-hidden overscroll-none font-sans flex flex-col items-center justify-center">
       <WarpSpeed active={warpActive} paused={!isSimulating} speed={1.5} />
       
       {/* ORB CONTAINER: CENTERED WITH MARGIN FOR MOBILE VISIBILITY */}
-      <div className="absolute z-10 flex flex-col items-center justify-center w-full h-full pointer-events-none pb-20 md:pb-0">
+      <div className="absolute z-10 flex flex-col items-center justify-center w-full h-full pointer-events-none">
          {isTurnZero && !isSimulating && (
              <div className="fixed inset-0 flex items-center justify-center pointer-events-auto z-30">
                  <div className="text-center animate-pulse">
@@ -444,8 +444,7 @@ function GameContent() {
          <div className={`allocation-tracker ${totalAllocation === 100 ? 'text-valid' : 'text-invalid'}`}>TOTAL: {totalAllocation}%</div>
          
          {/* SLIDER CARDS */}
-         <div className="flex gap-2 md:gap-6 mb-2 md:mb-8 w-full max-w-5xl overflow-x-auto no-scrollbar justify-center pointer-events-auto px-1">
-            {Object.keys(gameState!.portfolio).map(ticker => {
+         <div className="flex gap-1 md:gap-6 mb-2 md:mb-8 w-full max-w-5xl justify-between md:justify-center pointer-events-auto px-2 md:px-1">            {Object.keys(gameState!.portfolio).map(ticker => {
                 const change = priceChanges[ticker] || { direction: 'same', pct: 0 };
                 const isUp = change.direction === 'up'; const isDown = change.direction === 'down';
                 const priceStyle = flashing ? (isUp ? 'text-green-400 scale-110' : isDown ? 'text-red-400 scale-110' : 'text-gray-400') : 'text-gray-400';
@@ -475,7 +474,7 @@ function GameContent() {
          {/* EXECUTE BUTTON - Compact Mobile Size */}
          {gameState!.turn < 10 && (
              <button onClick={handleExecuteTurn} disabled={totalAllocation !== 100 || isSimulating} className={`btn-execute-turn ${(totalAllocation !== 100 || isSimulating) ? 'opacity-50 cursor-not-allowed hover:scale-100 shadow-none' : ''}`}>
-                {isSimulating ? "..." : (gameState!.turn === 0 ? "BEGIN" : "EXECUTE")}
+                {isSimulating ? "Trading..." : (gameState!.turn === 0 ? "BEGIN" : "EXECUTE")}
              </button>
          )}
          {gameState!.turn >= 10 && (<div className="text-sm md:text-2xl font-bold text-green-400 animate-pulse">COMPLETE</div>)}

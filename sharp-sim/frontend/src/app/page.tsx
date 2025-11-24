@@ -165,13 +165,13 @@
     );
   
     const renderSkeletons = (suffix: string) => (
-      <>{Array.from({ length: 8 }).map((_, i) => <AssetSkeleton key={`skel_${suffix}_${i}`} />)}</>
-    );
-  
-    return (
-      <main className="h-screen bg-black text-white flex flex-col relative overflow-hidden font-sans">
-        
-        <header className="home-header">
+        <>{Array.from({ length: 8 }).map((_, i) => <AssetSkeleton key={`skel_${suffix}_${i}`} />)}</>
+      );
+    
+      return (
+        <main className="fixed inset-0 h-[100dvh] md:relative md:h-screen w-full bg-black text-white flex flex-col overflow-hidden overscroll-none md:overscroll-auto font-sans">
+          
+          <header className="home-header">
           {user && (
               <button 
                   onClick={() => router.push('/leaderboard')}
@@ -247,8 +247,8 @@
           </div>
         </div>
   
-        <div className="absolute bottom-0 left-0 right-0 flex flex-col items-center w-full gap-3 md:gap-6 pb-4 md:pb-8 z-20 bg-gradient-to-t from-black via-black to-transparent pt-10">
-          <div className="relative w-full max-w-7xl h-28 md:h-40">
+        <div className="fixed md:absolute bottom-0 left-0 right-0 flex flex-col items-center w-full gap-3 md:gap-6 pb-2 md:pb-8 z-20 bg-gradient-to-t from-black via-black to-transparent pt-10">
+            <div className="relative w-full max-w-7xl h-28 md:h-40">
               <div className="absolute left-0 top-0 bottom-0 w-12 md:w-24 bg-gradient-to-r from-black to-transparent z-30 pointer-events-none" />
               <div className="absolute right-0 top-0 bottom-0 w-12 md:w-24 bg-gradient-to-l from-black to-transparent z-30 pointer-events-none" />
               <div ref={scrollContainerRef} onScroll={handleScroll} className="w-full h-full overflow-x-auto no-scrollbar flex items-center px-6 md:px-12">

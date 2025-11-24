@@ -92,7 +92,7 @@
                     className={`
                       leaderboard-card
                       ${index === 0 ? 'leaderboard-card-first' : 'leaderboard-card-normal'}
-                      ${isMe ? 'ring-2 ring-purple-500' : ''}
+                      ${isMe ? ' ring-purple-500' : ''}
                     `}
                   >
                     <div className="flex items-center gap-3 md:gap-4">

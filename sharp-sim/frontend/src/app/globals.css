@@ -141,7 +141,7 @@
     
     /* COMPACT BOTTOM CONTROL PANEL */
     .control-panel-container {
-      @apply absolute bottom-0 w-full bg-gradient-to-t from-black via-black/95 to-transparent 
+      @apply fixed md:absolute bottom-0 w-full bg-gradient-to-t from-black via-black/95 to-transparent 
              pt-4 md:pt-20 pb-2 md:pb-5 px-2 md:px-5 z-20 flex flex-col items-center;
     }
     
